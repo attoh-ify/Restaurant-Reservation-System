@@ -7,13 +7,13 @@ module.exports = (sequelize, DataTypes) => {
       // define association
 
       // Restaurant --> Table (One to Many)
-      Restaurant.hasMany(models.table, {
+      Restaurant.hasMany(models.Table, {
         foreignKey: "restaurantId",
         as: "tables"
       });
 
       // Restaurant --> Reservation (One to Many)
-      Restaurant.hasMany(models.reservation, {
+      Restaurant.hasMany(models.Reservation, {
         foreignKey: "restaurantId",
         as: "reservations"
       });
