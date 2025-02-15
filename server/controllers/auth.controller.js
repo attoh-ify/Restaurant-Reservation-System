@@ -5,9 +5,9 @@ const { v4: uuidv4 } = require("uuid");
 
 
 const register = async (req, res) => {
-    const { fullname, email, password, phone, phone2 = null } = req.body;
-
     try {
+        const { fullname, email, password, phone, phone2 = null } = req.body;
+
         // check if user exists
         const emailExists = await User.findOne({
             where: {
@@ -44,8 +44,9 @@ const register = async (req, res) => {
 
 
 const login = async (req, res) => {
-    const { email, password } = req.body;
     try {
+        const { email, password } = req.body;
+
         // check if email exists
         const user_ = await User.findOne({
             where: {
@@ -112,9 +113,9 @@ const getProfile = async (req, res) => {
 
 
 const updateProfile = async (req, res) => {
-    const { password, role, ...userDetails } = req.body;
-
     try {
+        const { password, ...userDetails } = req.body;
+
         // hash password
         if (password) {
             const saltRounds = 10;

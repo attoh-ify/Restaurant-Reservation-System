@@ -4,7 +4,7 @@ const DataTypes = require("sequelize");
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Restaurants', {
+    await queryInterface.createTable('Staffs', {
       id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
@@ -12,7 +12,7 @@ module.exports = {
         primaryKey: true,
         unique: true
       },
-      name: {
+      username: {
         type: DataTypes.STRING,
         allowNull: false,
       },
@@ -21,29 +21,14 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
-      phone: {
+      password: {
         type: DataTypes.STRING,
         allowNull: false,
       },
-      phone2: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-      address: {
+      role: {
         type: DataTypes.STRING,
         allowNull: false,
-      },
-      region: {
-        type: DataTypes.STRING,
-        allowNull: false,
-      },
-      description: {
-        type: DataTypes.STRING,
-        allowNull: false,
-      },
-      openingHours: {
-        type: DataTypes.STRING,
-        allowNull: false,
+        defaultValue: "staff"
       },
       createdAt: {
         allowNull: false,
@@ -56,6 +41,6 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('Restaurants');
+    await queryInterface.dropTable('Staffs');
   }
 };
