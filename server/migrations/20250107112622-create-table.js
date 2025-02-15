@@ -12,6 +12,22 @@ module.exports = {
         primaryKey: true,
         unique: true
       },
+      restaurantId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: 'Restaurants',
+          key: 'id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'CASCADE',
+      },
+      tableNumber: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+      },
       capacity: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -25,11 +41,6 @@ module.exports = {
         type: DataTypes.ARRAY(DataTypes.STRING),
         allowNull: false,
         defaultValue: []
-      },
-      isAvailable: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false
       },
       createdAt: {
         allowNull: false,

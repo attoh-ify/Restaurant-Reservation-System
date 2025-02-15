@@ -16,14 +16,20 @@ module.exports = (sequelize, DataTypes) => {
       Table.hasMany(models.Reservation, {
         foreignKey: "tableId",
         as: "reservations"
-      })
+      });
+
+      // Table --> TableSchedule (One to Many)
+      Table.hasMany(models.TableSchedule, {
+        foreignKey: "tableId",
+        as: "tableschedules"
+      });
     };
   }
   Table.init({
+    tableNumber: DataTypes.INTEGER,
     capacity: DataTypes.INTEGER,
     isOutdoor: DataTypes.BOOLEAN,
-    specialFeatures: DataTypes.ARRAY(DataTypes.STRING),
-    isAvailable: DataTypes.BOOLEAN
+    specialFeatures: DataTypes.ARRAY(DataTypes.STRING)
   }, {
     sequelize,
     modelName: 'Table',

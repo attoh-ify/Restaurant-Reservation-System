@@ -12,7 +12,7 @@ module.exports = {
         primaryKey: true,
         unique: true
       },
-      reservationTime: {
+      tableScheduleKey: {
         type: DataTypes.STRING,
         allowNull: true
       },
@@ -29,6 +29,36 @@ module.exports = {
         type: DataTypes.STRING,
         unique: true,
         allowNull: true
+      },
+      userId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: 'Users',
+          key: 'id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
+      },
+      restaurantId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: 'Restaurants',
+          key: 'id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
+      },
+      tableId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: 'Tables',
+          key: 'id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'SET NULL',
       },
       createdAt: {
         allowNull: false,

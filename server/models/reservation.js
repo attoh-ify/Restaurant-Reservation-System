@@ -25,7 +25,7 @@ module.exports = (sequelize, DataTypes) => {
     };
   }
   Reservation.init({
-    reservationTime: DataTypes.STRING,
+    tableScheduleKey: DataTypes.STRING,
     partySize: DataTypes.INTEGER,
     status: DataTypes.ENUM("confirmed", "pending", "canceled", "completed"),
     reservationCode: DataTypes.STRING
