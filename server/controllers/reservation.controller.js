@@ -1,15 +1,29 @@
-const { Restaurant, Table, Reservation, TableSchedule } = require("../models");
+const { Restaurant, Table, Reservation } = require("../models");
 const { confirmTime } = require("../utilities/confirmTime");
 const { generateReservationCode } = require("../utilities/generateReservationCode");
 const { v4: uuidv4 } = require("uuid");
 const { constants } = require("../constants");
 const { optimizeReservation } = require("../utilities/optimizeReservation");
 const { isWithinBusinessHours } = require("../utilities/isWithinBusinessHours");
+const { setStatus } = require("../utilities/setStatus");
+const { stripePayment } = require("../services/stripePayment");
+const { trackPendingReservation } = require("../utilities/trackPendingReservation");
 
 
 const createReservation = async (req, res) => {
     try {
         const { tableId, restaurantId, partySize, reservationTime, reservationTimeRange } = req.body;
+
+        // check if User has reservations still pending
+        const userHasAPendingReservation = await Reservation.findOne({
+            where: {
+                userId: req.userId,
+                status: "pending",
+            }
+        });
+        if (userHasAPendingReservation) {
+            return res.status(400).json({ message: 'You currently have a table reservation with status "Pending". Please Confirm or Cancel reservation first before you can make further reservations' });
+        };
 
         // Validate time variables
         // - ensure all time variables are not empty
@@ -28,7 +42,6 @@ const createReservation = async (req, res) => {
         let [hours, minutes, seconds] = timePart.split(":").map(Number);
         // Create a new Date object in local time
         let reservationStartTime = new Date(year, month - 1, day, hours, minutes, seconds);
-        console.log(reservationStartTime);
         let reservationEndTime = new Date(reservationTime);
         reservationEndTime = reservationEndTime.setMinutes(reservationStartTime.getMinutes() + reservationTimeRange);
         reservationEndTime = new Date(reservationEndTime);
@@ -61,7 +74,6 @@ const createReservation = async (req, res) => {
         let maxAllowedDate = new Date(currentTime);
         maxAllowedDate.setDate(maxAllowedDate.getDate() + 91);
         maxAllowedDate = maxAllowedDate.toLocaleDateString('en-CA');
-        console.log("maxAllowedDate: ", maxAllowedDate);
         // Ensure selected date is at least 30 minutes ahead of now
         let minAllowedTime = new Date(currentTime.getTime() + 30 * 60 * 1000);  // Add 30 minutes to the current time
         // Check if the selected time is at least 1 hour 30 minutes ahead
@@ -80,7 +92,7 @@ const createReservation = async (req, res) => {
         };
 
         // Lock table
-        // check if someone is currently trying to make a reservation for a table
+        // check if someone is currently trying to make a reservation for this table
         const existingPendingReservation = await Reservation.findOne({
             where: {
                 tableId: tableId,
@@ -88,7 +100,7 @@ const createReservation = async (req, res) => {
             }
         });
         if (existingPendingReservation) {
-            return res.status(400).json({ message: "A user is currently making arrangements for this table. Please try again after 10 minutes to see what spaces are available." });
+            return res.status(400).json({ message: `A user is currently making arrangements for this table. Please try again after ${constants.pendingReservationGrace} minutes to see what spaces are available.` });
         };
 
         // Create a pending reservation
@@ -105,6 +117,11 @@ const createReservation = async (req, res) => {
             status: "pending",
             reservationCode: reservationCode
         });
+        const reservation = await Reservation.findOne({
+            where: {
+                id: reservationId
+            }
+        });
 
         // Optimize schedule to reduce time wastage
         let reservationSchedule = {
@@ -116,12 +133,10 @@ const createReservation = async (req, res) => {
         };
 
         let optimizedReservation = await optimizeReservation(reservationDate, reservationSchedule, tableId);
-        if (!optimizeReservation.isOptimized) {
-            const [updatedReservationStatus] = await Reservation.update({ status: "confirmed" }, {
-                where: {
-                    id: reservationId
-                }
-            });
+        await trackPendingReservation(constants.pendingReservationGrace, reservation.dataValues.createdAt, reservationId);
+        if (!optimizedReservation.optimized) {
+            const paymentURL = await stripePayment(req.userId, reservationId);
+            return res.status(200).json(paymentURL);
         };
         return res.status(200).json({ message: optimizedReservation.message });
 
@@ -158,85 +173,26 @@ const reservationStatusController = async (req, res) => {
     try {
         const { reservationId, status } = req.body;
 
-        // - ensure all time variables are not empty
-        if (!reservationId || !status) {
-            return res.status(400).json({ message: "reservationId and status are required." });
-        };
-
-        // Get Reservation
         const reservation = await Reservation.findOne({
             where: {
-                id: reservationId,
-            }
-        });
-        let tableId = reservation.dataValues.tableId;
-        let restaurantId = reservation.dataValues.restaurantId;
-        // Get table schedule
-        const tableSchedule = await TableSchedule.findOne({
-            where: {
-                tableId: reservation.tableId,
-                key: reservation.tableScheduleKey
+                id: reservationId
             }
         });
 
-        // Check if reservation has already been canceled
-        // if (reservation.dataValues.status === "canceled") { return res.status(400).json({ message: "This reservation has already been canceled and status can not be altered" }) };
+        // Check if the User is trying to change to the same status
+        if (reservation.dataValues.status === status) { return { message: `This reservation has already been ${status} and status can not be altered` } };
 
-        // Check if user is passing the appropriate response
-        if (status !== "confirmed" && status !== "canceled") {
-            return res.status(400).json({ message: "Invalid response status from user" });
+        if (status === "confirmed") {
+            const paymentURL = await stripePayment(req.userId, reservationId);
+            return res.status(200).json(paymentURL);
         };
 
-        const [updatedReservationStatus] = await Reservation.update({ status: status }, {
-            where: {
-                restaurantId: restaurantId,
-                tableId: tableId,
-                userId: req.userId
-            }
-        });
-
-        const updatedReservation = await Reservation.findOne({
-            where: {
-                restaurantId: restaurantId,
-                tableId: tableId,
-                userId: req.userId
-            }
-        });
-
-        if (status === "canceled") {  // remove reservation from the appropriate tables table schedule
-            console.log('1');
-            const tableSchedule = await TableSchedule.findOne({
-                where: {
-                    key: reservation.dataValues.tableScheduleKey,
-                    tableId: tableId
-                }
-            });
-            console.log('2');
-
-            let tableScheduleValues = tableSchedule.value;
-            const startTime = tableScheduleValues.find(schedule => schedule.reservationId != tableScheduleValues.reservationId).startTime;
-            const endTime = tableScheduleValues.find(schedule => schedule.reservationId != tableScheduleValues.reservationId).endTime;
-            const newKey = tableSchedule.dataValues.key + " " + startTime + " - " + endTime;  // concatenation of both the date and time
-            tableScheduleValues = tableScheduleValues.filter(schedule => schedule.reservationId != tableScheduleValues.reservationId);
-            console.log('newKey: ', newKey);
-
-            const [updatedTableSchedule] = await TableSchedule.update({ key: newKey, value: tableScheduleValues }, {
-                where: {
-                    id: tableSchedule.dataValues.id
-                }
-            });
-            const [updatedReservationStatus] = await Reservation.update({ tableScheduleKey: newKey }, {
-                where: {
-                    restaurantId: restaurantId,
-                    tableId: tableId,
-                    userId: req.userId
-                }
-            });
+        const response = setStatus(status, reservationId);
+        if (response.message) {
+            return res.status(400).json({ message: response.message });
         };
 
-        const { reservationCode: reservationCode, ...ReservationInfo } = updatedReservation.dataValues;
-
-        return res.status(200).json({ message: "Reservation updated successfully", updatedReservation: ReservationInfo });
+        return res.status(200).json({ message: "Reservation updated successfully" });
     } catch (error) {
         console.log(error);
         return res.status(500).json({ message: "Failed to change reservation status" });
@@ -263,8 +219,8 @@ const deleteReservationTemporary = async (req, res) => {
     } catch (error) {
         console.log(error);
         return res.status(500).json({ message: "Failed to delete reservation" });
-    }
-}
+    };
+};
 
 
 module.exports = { createReservation, getAllPendingReservations, reservationStatusController, deleteReservationTemporary };

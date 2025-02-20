@@ -1,11 +1,11 @@
 const { constants } = require("../constants");
 const { TableSchedule } = require("../models");
-const { sortSchedule } = require("../utilities/sortSchedule");
+const { sortSchedule } = require("./sortSchedule");
+const { mailer } = require("../services/mailer");
 
 
 const optimizeReservation = async (reservationDate, reservationSchedule, tableId) => {
     try {
-        console.log("Optimizing Reservations...");
         // Get the reservation times
         const tableSchedule = await TableSchedule.findOne({
             where: {
@@ -14,15 +14,14 @@ const optimizeReservation = async (reservationDate, reservationSchedule, tableId
             }
         });
 
-        if (Array.isArray(tableSchedule.dataValues.value) && tableSchedule.dataValues.value.length === 0) {
-            reservationSchedule.status = "confirmed";
+        if (Array.isArray(tableSchedule.dataValues.value) && tableSchedule.dataValues.value.length === 0) {  // if the table schedule for that table and date is empty, just add this reservation
+            console.log(reservationSchedule)
             const [updatedTableSchedule] = await TableSchedule.update({ value: [reservationSchedule] }, {
                 where: {
                     id: tableSchedule.dataValues.id
                 }
             });
-            console.log("new Tables Schedule value: ", [reservationSchedule]);
-            console.log("Done optimizing reservations...");
+            
             return {
                 message: "Reservation has been successfully created. We look forward to having you!",
                 optimized: false
@@ -33,14 +32,8 @@ const optimizeReservation = async (reservationDate, reservationSchedule, tableId
         let endTime = new Date(reservationSchedule.endTime);
         let tableScheduleValuesConfirmed = tableSchedule.dataValues.value.filter(schedule => schedule.status === "confirmed");  // array of all the table schedules that are confirmed
         let tableScheduleValuesNotConfirmed = tableSchedule.dataValues.value.filter(schedule => schedule.status !== "confirmed");  // array of all the table schedules that are not confirmed
-        console.log("startTime: ", startTime);
-        console.log("endTime: ", endTime);
-        console.log("tableScheduleValuesConfirmed: ", tableScheduleValuesConfirmed);
-        console.log("tableScheduleValuesNotConfirmed: ", tableScheduleValuesNotConfirmed);
 
         let schedule = sortSchedule(tableScheduleValuesConfirmed, reservationSchedule);
-        console.log("Sorted schedule: ", schedule);
-        console.log("tableScheduleValuesConfirmed: ", tableScheduleValuesConfirmed);
         const reservationScheduleIndex = schedule.findIndex(reservation => reservation.reservationId === reservationSchedule.reservationId);
         const prevReservationScheduleIndex = reservationScheduleIndex - 1;
 
@@ -49,7 +42,6 @@ const optimizeReservation = async (reservationDate, reservationSchedule, tableId
             let prevReservationEndTime = new Date(prevReservation.endTime);
             prevReservationEndTime.setMinutes(prevReservationEndTime.getMinutes() + constants.buffer); // factor in the buffer after each reservation
             const reservationTimeGap = Math.abs(((prevReservationEndTime - startTime) / (1000 * 60)));
-            console.log("reservationTimeGap: ", reservationTimeGap);
             let adjustableTime;
             if (0 < reservationTimeGap && reservationTimeGap < 120) {
                 adjustableTime = reservationTimeGap;
@@ -62,23 +54,17 @@ const optimizeReservation = async (reservationDate, reservationSchedule, tableId
             } else if (210 < reservationTimeGap && reservationTimeGap < 240) {
                 adjustableTime = reservationTimeGap - 210;
             } else {
-                schedule = schedule.map(schedule =>
-                    schedule.reservationId === reservationSchedule.reservationId
-                        ? { ...schedule, status: "confirmed" }
-                        : schedule
-                );
                 const [updatedTableSchedule] = await TableSchedule.update({ value: schedule }, {
                     where: {
                         id: tableSchedule.dataValues.id
                     }
                 });
-                console.log("Done optimizing reservations...");
+
                 return {
                     message: "Reservation has been successfully created. We look forward to having you!",
                     optimized: false
                 };
             };
-            console.log("adjustableTime: ", adjustableTime);
             let newReservationStartTime = new Date(startTime);
             let newReservationEndTime = new Date(endTime);
             newReservationStartTime.setMinutes(newReservationStartTime.getMinutes() - adjustableTime);
@@ -86,36 +72,26 @@ const optimizeReservation = async (reservationDate, reservationSchedule, tableId
             reservationSchedule.startTime = newReservationStartTime;
             reservationSchedule.endTime = newReservationEndTime;
             schedule = sortSchedule(tableScheduleValuesConfirmed, reservationSchedule);
-            console.log("schedule: ", schedule);
-            console.log("tableScheduleValuesConfirmed: ", tableScheduleValuesConfirmed);
-            console.log("tableScheduleValuesNotConfirmed: ", tableScheduleValuesNotConfirmed);
             let totalSchedule = [...schedule, ...tableScheduleValuesNotConfirmed];
-            console.log("newReservationStartTime: ", newReservationStartTime);
-            console.log("newReservationEndTime: ", newReservationEndTime);
-            console.log("newReservationSchedule: ", reservationSchedule);
-            console.log("newTableSchedule: ", totalSchedule);
             const [updatedTableSchedule] = await TableSchedule.update({ value: totalSchedule }, {
                 where: {
                     id: tableSchedule.dataValues.id
                 }
             });
-            console.log("Done optimizing reservations...");
+
+            mailer(process.env.RECEIVING_EMAIL_ADDRESS, "adjusted", startTime);
+
             return {
                 message: "An adjustment was made to your selected time to maximize the use of the table. Please confirm if it would okay by you or select another available time for the reservation.",
                 optimized: true
             };
-        } else {  // no reservation exists before the users selected reservation time so just confirm the reservation
-            schedule = schedule.map(schedule =>
-                schedule.reservationId === reservationSchedule.reservationId
-                    ? { ...schedule, status: "confirmed" }
-                    : schedule
-            );
+        } else {  // no reservation has been scheduled prior to the users selected reservation time so just confirm the reservation
             const [updatedTableSchedule] = await TableSchedule.update({ value: schedule }, {
                 where: {
                     id: tableSchedule.dataValues.id
                 }
             });
-            console.log("Done optimizing reservations...");
+
             return {
                 message: "Reservation has been successfully created. We look forward to having you!",
                 optimized: false

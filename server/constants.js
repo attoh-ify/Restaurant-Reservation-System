@@ -1,5 +1,6 @@
 const constants = Object.freeze({
-    buffer: 20
+    buffer: 20,
+    pendingReservationGrace: 10
 });
 
 const STAFF_ROLES = Object.freeze({

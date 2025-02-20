@@ -1,5 +1,5 @@
 const express = require("express");
-const { createReservation, getAllPendingReservations, reservationStatusController, deleteReservationTemporary } = require("../controllers/reservation.controller.js");
+const { createReservation, getAllPendingReservations, reservationStatusController, deleteReservationTemporary, paymentSuccessful, paymentFailed } = require("../controllers/reservation.controller.js");
 const { verifyUserToken } = require("../middlewares/verifyToken.js");
 
 const router = express.Router();
