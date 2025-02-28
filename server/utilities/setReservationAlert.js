@@ -1,6 +1,7 @@
 const { Reservation, TableSchedule } = require("../models");
 const { mailer } = require("../services/mailer");
 const cron = require("node-cron");
+const { setStatus } = require("./setStatus");
 
 
 const checkAndAdjustReservationStatus = async (reservationId) => {  // check if reservation is still pending and cancel it if true
@@ -59,23 +60,32 @@ const formatToCron = (date) => {
 };
 
 
-const trackPendingReservation = async (pendingReservationGraceTime, reservationCreationTime, reservationId) => {
+const setReservationAlert = async (notifyAt, reservationId, eventType) => {
     try {
-        // console.log(reservationCreationTime);
-        // Add pending reservation grace time to the reservation time
-        let pendingReservationCreationTime = new Date(reservationCreationTime);
-        pendingReservationCreationTime.setMinutes(pendingReservationCreationTime.getMinutes() + pendingReservationGraceTime);
-        // console.log(pendingReservationCreationTime);
-
-        const cronExpression = formatToCron(pendingReservationCreationTime);
+        const notifyAtTime = new Date(notifyAt);
+        const cronExpression = formatToCron(notifyAtTime);
         // console.log(cronExpression);
 
-        cron.schedule(cronExpression, async () => {
-            await checkAndAdjustReservationStatus(reservationId);
-        });
+        if (eventType === "pending") {
+            cron.schedule(cronExpression, async () => {
+                await checkAndAdjustReservationStatus(reservationId);
+            });
+        } else if (eventType === "reminder1D") {
+            cron.schedule(cronExpression, async () => {
+                mailer(process.env.RECEIVING_EMAIL_ADDRESS, "reminder1D", notifyAt);
+            });
+        } else if (eventType === "reminder1H") {
+            cron.schedule(cronExpression, async () => {
+                mailer(process.env.RECEIVING_EMAIL_ADDRESS, "reminder1H", notifyAt);
+            });
+        } else if (eventType === "completed") {
+            cron.schedule(cronExpression, async () => {
+                await setStatus("completed", reservationId);
+            });
+        };
     } catch (error) {
         console.log(error);
     };
 };
 
-module.exports = { trackPendingReservation };
+module.exports = { setReservationAlert };

@@ -18,8 +18,11 @@ const setStatus = async (status, reservationId) => {
         // Check if reservation has already been canceled
         if (reservation.dataValues.status === "canceled") { return { message: "This reservation has already been canceled and status can not be altered" } };
 
+        // Check if reservation has already been completed
+        if (reservation.dataValues.status === "completed") { return { message: "This reservation has already been completed and status can not be altered" } };
+
         // Check if the User is trying to change to the same status
-        if (reservation.dataValues.status === status) { return { message: `This reservation has already been ${status} and status can not be altered` } };
+        if (reservation.dataValues.status === status) { return { message: `This reservation is already ${status}` } };
 
         // Check if user is passing the appropriate response
         if (status !== "confirmed" && status !== "canceled") {

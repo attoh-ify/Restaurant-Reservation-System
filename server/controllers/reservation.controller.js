@@ -7,7 +7,7 @@ const { optimizeReservation } = require("../utilities/optimizeReservation");
 const { isWithinBusinessHours } = require("../utilities/isWithinBusinessHours");
 const { setStatus } = require("../utilities/setStatus");
 const { stripePayment } = require("../services/stripePayment");
-const { trackPendingReservation } = require("../utilities/trackPendingReservation");
+const { setReservationAlert } = require("../utilities/setReservationAlert");
 
 
 const createReservation = async (req, res) => {
@@ -32,7 +32,7 @@ const createReservation = async (req, res) => {
         };
 
         // Validate reservationTimeRange
-        const validTimeRanges = new Set([120, 150, 180, 210]);
+        const validTimeRanges = new Set([120, 150, 180, 210, 240]);
         if (!validTimeRanges.has(reservationTimeRange)) {
             return res.status(400).json({ message: "Invalid reservation time range." });
         };
@@ -133,7 +133,10 @@ const createReservation = async (req, res) => {
         };
 
         let optimizedReservation = await optimizeReservation(reservationDate, reservationSchedule, tableId);
-        await trackPendingReservation(constants.pendingReservationGrace, reservation.dataValues.createdAt, reservationId);
+        // Add pending reservation grace time to the notifyAt time
+        let notifyAt = new Date(reservation.createdAt);
+        notifyAt.setMinutes(notifyAt.getMinutes() + constants.pendingReservationGrace);
+        await setReservationAlert(notifyAt, reservationId, "pending")
         if (!optimizedReservation.optimized) {
             const paymentURL = await stripePayment(req.userId, reservationId);
             return res.status(200).json(paymentURL);
@@ -147,7 +150,7 @@ const createReservation = async (req, res) => {
 };
 
 
-const getAllPendingReservations = async (req, res) => {
+const getAllReservations = async (req, res) => {
     try {
         const { restaurantId, tableId } = req.body;
 
@@ -223,4 +226,4 @@ const deleteReservationTemporary = async (req, res) => {
 };
 
 
-module.exports = { createReservation, getAllPendingReservations, reservationStatusController, deleteReservationTemporary };
+module.exports = { createReservation, getAllReservations, reservationStatusController, deleteReservationTemporary };

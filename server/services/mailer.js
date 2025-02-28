@@ -35,6 +35,34 @@ const mail_response = (status, reservationTime) => {
                 <p>We look forward to having you!</p>
                 <h3>Have a blessed day.</p>`
         }
+    } else if (status === "completed") {
+        return {
+            subject: "Reservation Completed",
+            html: `
+                <h1>Your Reservation Has Been Completed</h1>
+                <p>Your reservation scheduled for ${reservationTime} has been completed.</p>
+                <p>It was really great having you here today</p>
+                <p>We look forward to having you again!</p>
+                <h3>Have a blessed day.</p>`
+        }
+    } else if (status === "reminder1H") {
+        return {
+            subject: "Reservation Reminder",
+            html: `
+                <h1>Reservation Reminder</h1>
+                <p>This is to remind you that your reservation scheduled for ${reservationTime} is coming up in an hour.</p>
+                <p>We look forward to having you then!</p>
+                <h3>Have a blessed day.</p>`
+        }
+    } else if (status === "reminder1D") {
+        return {
+            subject: "Reservation Reminder",
+            html: `
+                <h1>Reservation Reminder</h1>
+                <p>This is to remind you that your reservation scheduled for ${reservationTime} is coming up tomorrow.</p>
+                <p>We look forward to having you then!</p>
+                <h3>Have a blessed day.</p>`
+        }
     };
 };
 

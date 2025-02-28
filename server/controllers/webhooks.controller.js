@@ -1,5 +1,6 @@
 const stripe = require("stripe")(process.env.STRIPE_PRIVATE_KEY);
 const { setStatus } = require("../utilities/setStatus");
+const { setReservationAlert } = require("../utilities/setReservationAlert");
 
 
 const stripeWebhook = async (req, res) => {
@@ -21,11 +22,33 @@ const stripeWebhook = async (req, res) => {
             setStatus("confirmed", reservationId);
 
             console.log("Reservation updated successfully.");
-        } else if (event.type === "payment_intent.payment_failed" || event.type === "checkout.session.expired" ) {
-            const paymentIntent  = event.data.object;
 
-            const userId = paymentIntent .metadata.userId;
-            const reservationId = paymentIntent .metadata.reservationId;
+            const reservation = await Reservation.findOne({
+                where: {
+                    id: reservationId
+                }
+            });
+            const tableSchedule = await TableSchedule.findOne({
+                where: {
+                    tableId: reservation.tableId,
+                    key: reservation.tableScheduleKey
+                }
+            });
+
+            let notifyTime = tableSchedule.dataValues.value.filter(schedule => schedule.reservationId === reservationId)[0].startTime;;
+            let reservationDate = new Date(notifyTime);
+            reservationDate = reservationDate.toLocaleDateString('en-CA');
+            let oneHourBeforeTime = new Date(notifyTime.getTime() - 60 * 60 * 1000);  // 1 hour before
+            let reservationEndTime = tableSchedule.dataValues.value.filter(schedule => schedule.reservationId === reservation.id)[0].endTime;
+
+            await setReservationAlert(oneHourBeforeTime, reservationId, "reminder1H");
+            await setReservationAlert(reservationDate, reservationId, "reminder1D");
+            await setReservationAlert(reservationEndTime, reservation.id, "completed");
+        } else if (event.type === "payment_intent.payment_failed" || event.type === "checkout.session.expired") {
+            const paymentIntent = event.data.object;
+
+            const userId = paymentIntent.metadata.userId;
+            const reservationId = paymentIntent.metadata.reservationId;
 
             console.log(`Payment failed for User: ${userId}, Reservation: ${reservationId}`);
 
