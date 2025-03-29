@@ -10,6 +10,7 @@ A backend project using Node.js that enables users to book reservations at their
 - Stripe payment integration
 - Email notifications for reservation updates
 - Automated reminders and status updates
+- Swagger API documentation
 
 ## Project Structure
 server/ 
@@ -21,8 +22,11 @@ server/
 ├── routes/ # API routes 
 ├── services/ # External services (e.g., mailer, Stripe) 
 ├── utilities/ # Utility functions 
-├── logs/ # Log files 
+├── logs/ # Log files
+├── Dockerfile # Docker configuration
+├── docker-compose.yml # Docker Compose configuration
 ├── server.js # Entry point
+
 
 
 ## Prerequisites
@@ -59,6 +63,19 @@ server/
 5. Start the server:
   npm run dev
 
+## Docker Setup
+1. Build the Docker images:
+   docker-compose build
+2. Start the containers:
+   docker-compose up
+3. Access the application at http://localhost:5000.
+4. Stop the containers:
+  docker-compose down
+
+
+## API Documentation
+The API is documented using Swagger. Access the documentation at:
+http://localhost:5000/api-docs
 
 API Endpoints
   Authentication
@@ -66,7 +83,7 @@ API Endpoints
     POST /login/ - Log in a user
     POST /logout/ - Log out a user
   Admin
-    POST /admin/create/ - Create an admin account
+    POST /admin/register/ - Create an admin account
     POST /admin/login/ - Admin login
     POST /admin/logout/ - Admin logout
   Reservations
@@ -74,8 +91,8 @@ API Endpoints
     POST /reservation/status/ - Update reservation status
     DELETE /reservation/delete/ - Delete a reservation
   Tables
-    POST /table/filter/ - Filter tables
-    GET /table/get-table-schedule/ - Get table schedules
+    POST /restaurant/table/filter/ - Filter tables
+    GET /restaurant/table/get-table-schedule/ - Get table schedules
 
     
 Testing
